@@ -10,14 +10,14 @@ import (
 	log "github.com/tengfei-xy/go-log"
 )
 
-func exportMD(data []byte, cookie string, reqId string) (string, error) {
-	d, ok := exportMarkdownData(data, cookie, reqId)
+func exportMD(data []byte, cookie string) (string, error) {
+	d, ok := exportMarkdownData(data, cookie)
 	if !ok {
 		return "", fmt.Errorf("获取失败")
 	}
 	return exportMarkdownDeal(d)
 }
-func exportMarkdownData(data []byte, cookie string, reqId string) ([]byte, bool) {
+func exportMarkdownData(data []byte, cookie string) ([]byte, bool) {
 
 	client := &http.Client{}
 	req, err := http.NewRequest("POST", `https://api.wolai.com/v1/exportMarkdown`, bytes.NewReader(data))
@@ -43,7 +43,7 @@ func exportMarkdownData(data []byte, cookie string, reqId string) ([]byte, bool)
 	req.Header.Set("wolai-client-platform", `web`)
 	req.Header.Set("x-client-timeoffset", `-480`)
 	req.Header.Set("wolai-client-version", ``)
-	req.Header.Set("reqId", reqId)
+	req.Header.Set("reqId", "7NYkp7BR1wdJm1oXFRevfJ")
 
 	resp, err := client.Do(req)
 	if err != nil {

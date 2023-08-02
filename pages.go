@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 
@@ -16,15 +16,15 @@ type downloadMD struct {
 	filename          string
 }
 
-func getPagesList(cookie string, reqId string) ([]downloadMD, bool) {
+func getPagesList(cookie string) ([]downloadMD, bool) {
 
-	data, ok := getWorkspacePages(cookie, reqId)
+	data, ok := getWorkspacePages(cookie)
 	if !ok {
 		return nil, ok
 	}
 	return pagesDeal(data)
 }
-func getWorkspacePages(cookie string, reqId string) ([]byte, bool) {
+func getWorkspacePages(cookie string) ([]byte, bool) {
 
 	client := &http.Client{}
 	req, err := http.NewRequest("POST", `https://api.wolai.com/v1/workspace/getWorkspacePages`, nil)
@@ -50,7 +50,7 @@ func getWorkspacePages(cookie string, reqId string) ([]byte, bool) {
 	req.Header.Set("wolai-client-platform", `web`)
 	req.Header.Set("x-client-timeoffset", `-480`)
 	req.Header.Set("wolai-client-version", ``)
-	req.Header.Set("reqId", reqId)
+	req.Header.Set("reqId", "7NYkp7BR1wdJm1oXFRevfJ")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -64,7 +64,7 @@ func getWorkspacePages(cookie string, reqId string) ([]byte, bool) {
 		return nil, false
 	}
 
-	resp_data, err := ioutil.ReadAll(resp.Body)
+	resp_data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Errorf("内部错误:%v", err)
 		return nil, false
@@ -79,7 +79,7 @@ func pagesDeal(data []byte) ([]downloadMD, bool) {
 		return nil, false
 	}
 	if p.Code != 1000 {
-		log.Errorf("请求异常:%d", p.Code)
+		log.Errorf("请求异常 状态码:%d 消息:%s", p.Code, p.Message)
 		return nil, false
 	}
 	dmd := make([]downloadMD, len(p.Data.Blocks))
@@ -91,7 +91,7 @@ func pagesDeal(data []byte) ([]downloadMD, bool) {
 		dmd[i].workSpacePageName = p.Data.Blocks[id.workSpacePageID].Value.Attributes.Title[0][0]
 	}
 	for _, id := range dmd {
-		log.Infof("获取ID成功:%s", id.workSpacePageName)
+		log.Infof("发现工作区页面 名称:%s", id.workSpacePageName)
 	}
 	return dmd, true
 }
