@@ -3,25 +3,17 @@ wolai的一些便捷功能，支持导出所有文章（怕官方跑路哈哈哈
 
 
 
-## 项目编译
-
-编译（版本：1.19.6）
-
-```shell
-go clone https://github.com/tengfei-xy/wolai.git
-cd wolai
-go build
-```
-
-
-
 ## 使用方法
+
+[下载地址](https://github.com/tengfei-xy/wolai/releases)
 
 1.首次运行将生成config.yaml.tmp
 
 2.修改配置文件后并重命名为config.yaml
 
 3.重新运行主程序
+
+
 
 ## 配置文件说明
 
@@ -36,6 +28,12 @@ ignore:
 		# 忽略的页面名称
     ignorePageName: ["计算机","xxx"]
 ```
+
+
+
+## 系统说明
+
+1. windows的配置文件需要保存为ANSI编码，其他系统使用utf-8
 
 
 
@@ -93,4 +91,16 @@ ignore:
 ## 其他说明
 
 微信：SXL--LP（请备注Github哦）
+
+
+
+## 项目编译
+
+编译（版本：1.19.6）
+
+```shell
+go clone https://github.com/tengfei-xy/wolai.git
+cd wolai
+go build
+```
 

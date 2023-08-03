@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"runtime"
 
 	tools "github.com/tengfei-xy/go-tools"
 	"gopkg.in/yaml.v3"
@@ -23,12 +24,20 @@ func getConfig() (config, error) {
 		return config{}, err
 	}
 
+	if runtime.GOOS == "windows" {
+		data, err = tools.StringGBKToUTF_8(data)
+		if err != nil {
+			return config{}, err
+		}
+	}
+
 	if err := yaml.Unmarshal(data, &c); err != nil {
 		return config{}, err
 	}
 
 	return c, configOK(c)
 }
+
 func configOK(c config) error {
 	if c.Cookie == "" {
 		return fmt.Errorf("配置文件中的cookie值为空")
@@ -48,7 +57,6 @@ func configGenerate(file string) error {
 		return fmt.Errorf("%s", err)
 	}
 	return fmt.Errorf("已创建新配置文件,请修改后重新运行程序 位置:%s", file)
-
 }
 
 type config struct {

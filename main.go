@@ -11,7 +11,7 @@ import (
 	tools "github.com/tengfei-xy/go-tools"
 )
 
-const version string = "v0.1"
+const version string = "v0.1.1"
 
 func initMain(c config) error {
 	if err := os.Mkdir(c.Save.newTargetPath, 0755); err != nil {
@@ -47,6 +47,7 @@ func main() {
 	config, err := getConfig()
 	if err != nil {
 		log.Error(err)
+		tools.Delay(5)
 		return
 	}
 	config.Save.newTargetPath = filepath.Join(config.Save.TargetPATH, timeGetChineseString())
@@ -54,6 +55,7 @@ func main() {
 	// 获取所有的总页面ID和名称
 	pages, ok := getPagesList(config.Cookie)
 	if !ok {
+		tools.Delay(5)
 		return
 	}
 
@@ -96,5 +98,5 @@ func main() {
 		}
 		log.Infof("下载成功 文件名:%s 链接:%s", p.filename, p.url)
 	}
-
+	tools.Delay(5)
 }
