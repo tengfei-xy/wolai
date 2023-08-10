@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"strings"
 
 	log "github.com/tengfei-xy/go-log"
+	"github.com/tengfei-xy/go-tools"
 )
 
 type downloadMD struct {
@@ -30,16 +32,14 @@ func getPagesList(cookie string) ([]downloadMD, bool) {
 	}
 
 	// 补充工作区页面的名称
-	for _, space := range d {
-		data, ok := getWorkspacePagesData(cookie, &space)
+	for i, space := range d {
+		data, ok := space.getWorkspacePagesData(cookie)
 
 		if !ok {
 			break
 		}
-		getWorkspacePagesDeal(data, &space)
-		for i, _ := range space.workSpacePageID {
-			log.Infof("发现 工作区名称:%s 页面名称:%s", space.workSpaceName, space.workSpacePageName[i])
-		}
+		space.getWorkspacePagesDeal(data)
+		d[i] = space
 	}
 
 	return d, true
@@ -113,10 +113,10 @@ func pagesDataDeal(data []byte) ([]downloadMD, bool) {
 
 	return dmd, true
 }
-func getWorkspacePagesData(cookie string, dmd *downloadMD) ([]byte, bool) {
+func (space downloadMD) getWorkspacePagesData(cookie string) ([]byte, bool) {
 
 	client := &http.Client{}
-	req, err := http.NewRequest("POST", `https://api.wolai.com/v1/workspace/getWorkspacePages`, strings.NewReader(fmt.Sprintf(`{"spaceId":"%s"}`, *&dmd.workSpaceID)))
+	req, err := http.NewRequest("POST", `https://api.wolai.com/v1/workspace/getWorkspacePages`, strings.NewReader(fmt.Sprintf(`{"spaceId":"%s"}`, space.workSpaceID)))
 	if err != nil {
 		log.Fatal(err)
 		return nil, false
@@ -160,7 +160,7 @@ func getWorkspacePagesData(cookie string, dmd *downloadMD) ([]byte, bool) {
 	return resp_data, true
 }
 
-func getWorkspacePagesDeal(data []byte, dmd *downloadMD) bool {
+func (space *downloadMD) getWorkspacePagesDeal(data []byte) bool {
 	var p workSpacePageList
 	err := json.Unmarshal(data, &p)
 	if err != nil {
@@ -171,10 +171,27 @@ func getWorkspacePagesDeal(data []byte, dmd *downloadMD) bool {
 		log.Errorf("请求异常 状态码:%d 消息:%s", p.Code, p.Message)
 		return false
 	}
-	for i, _ := range (*dmd).workSpacePageName {
-		(*dmd).workSpacePageName[i] = p.Data.Blocks[(*dmd).workSpacePageID[i]].Value.Attributes.Title[0][0]
+
+	for i, _ := range space.workSpacePageName {
+		space.workSpacePageName[i] = p.Data.Blocks[space.workSpacePageID[i]].Value.Attributes.Title[0][0]
+	}
+
+	v := reflect.ValueOf(p.Data.Blocks)
+	for _, id := range v.MapKeys() {
+		if !tools.ListHasString(space.workSpacePageID, id.String()) {
+			pageName := p.Data.Blocks[id.String()].Value.Attributes.Title[0][0]
+			space.workSpacePageID = append(space.workSpacePageID, id.String())
+			space.workSpacePageName = append(space.workSpacePageName, pageName)
+
+		}
+
 	}
 	return true
+}
+func (space downloadMD) output() {
+	for _, pageName := range space.workSpacePageName {
+		log.Infof("发现 工作区名称:%s 页面名称:%s", space.workSpaceName, pageName)
+	}
 }
 
 type workSpacePageList struct {
@@ -228,7 +245,6 @@ type Value struct {
 	Tableviews         []interface{}  `json:"tableviews"`
 	SubPages           []string       `json:"sub_pages"`
 }
-
 type DatabaseViews struct {
 }
 type DatabaseTables struct {

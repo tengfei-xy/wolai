@@ -75,6 +75,11 @@ func main() {
 		return
 	}
 
+	// 输出页面信息
+	for _, space := range workspace {
+		space.output()
+	}
+
 	// 开始导出
 	for _, space := range workspace {
 		exportMain(space)
