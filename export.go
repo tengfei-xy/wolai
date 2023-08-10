@@ -18,20 +18,18 @@ func exportMain(dmd downloadMD) {
 	var ignorePages []string
 	spaceName := dmd.workSpaceName
 
-	// 判断是否忽略空间
-	for _, igPageName := range dmd.workSpacePageName {
-		if igPageName == "*" {
-			log.Infof("忽略 空间名:%s", dmd.workSpaceName)
-			return
-		}
-	}
-
 	// 获取当前需要忽略的页面列表
 	for _, space := range config.Ignore {
 		if dmd.workSpaceName == space.SpaceName {
 			ignorePages = space.Page
 			break
 		}
+	}
+
+	// 忽略空间
+	if tools.ListHasString(ignorePages, "*") {
+		log.Infof("忽略 空间名:%s", dmd.workSpaceName)
+		return
 	}
 
 	// 设定导出的空间文件夹
