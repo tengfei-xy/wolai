@@ -4,12 +4,88 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
 
 	log "github.com/tengfei-xy/go-log"
+	tools "github.com/tengfei-xy/go-tools"
 )
 
+func exportMain(dmd downloadMD) {
+	var ignorePages []string
+	spaceName := dmd.workSpaceName
+
+	// 判断是否忽略空间
+	for _, igPageName := range dmd.workSpacePageName {
+		if igPageName == "*" {
+			log.Infof("忽略 空间名:%s", dmd.workSpaceName)
+			return
+		}
+	}
+
+	// 获取当前需要忽略的页面列表
+	for _, space := range config.Ignore {
+		if dmd.workSpaceName == space.SpaceName {
+			ignorePages = space.Page
+			break
+		}
+	}
+
+	// 设定导出的空间文件夹
+	spaceFolder := filepath.Join(config.Save.newTargetPath, spaceName)
+	if err := os.Mkdir(spaceFolder, 0755); err != nil {
+		log.Error(err)
+		return
+	}
+
+	for i, id := range dmd.workSpacePageID {
+		name := dmd.workSpacePageName[i]
+
+		// 忽略页面
+		if tools.ListHasString(ignorePages, name) {
+			log.Infof("忽略 空间名:%s 页面名称:%s", spaceName, name)
+			continue
+		}
+
+		reqJson, err := exportReqJsonAll(id, name)
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+
+		log.Infof("导出 空间名:%s 页面名:%s", spaceName, name)
+
+		// 获取 导出完成的下载的url
+		fileURL, err := exportMD(reqJson, config.Cookie)
+		if err != nil {
+			continue
+		}
+
+		// 设置下载链接和文件名
+		u, _ := url.ParseRequestURI(fileURL)
+		filename := filepath.Base(u.Path)
+
+		// 下载文件
+		if err := tools.FileDownload(fileURL, filepath.Join(spaceFolder, filename)); err != nil {
+			log.Error(err)
+			continue
+		}
+		log.Infof("下载成功 文件名:%s 链接:%s", filename, fileURL)
+	}
+
+}
+func exportReqJsonAll(id, name string) ([]byte, error) {
+	var e exportUP
+	e.PageID = id
+	e.PageTitle = name
+	e.Options.RecoverTree = true
+	e.Options.GenerateToc = "all"
+	e.Options.IncludeSubPage = true
+	return json.Marshal(e)
+}
 func exportMD(data []byte, cookie string) (string, error) {
 	d, ok := exportMarkdownData(data, cookie)
 	if !ok {
@@ -57,7 +133,7 @@ func exportMarkdownData(data []byte, cookie string) ([]byte, bool) {
 		return nil, false
 	}
 
-	resp_data, err := ioutil.ReadAll(resp.Body)
+	resp_data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Errorf("内部错误:%v", err)
 		return nil, false

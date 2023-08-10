@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 
@@ -11,13 +10,20 @@ import (
 	tools "github.com/tengfei-xy/go-tools"
 )
 
-const version string = "v0.1.1"
+const version string = "v0.2"
 
-func initMain(c config) error {
+var config Config
+
+func project() {
+	fmt.Printf("程序版本:%s\n", version)
+	fmt.Println("项目链接:https://github.com/tengfei-xy/wolai")
+
+}
+func initMain(c Config) error {
 	if err := os.Mkdir(c.Save.newTargetPath, 0755); err != nil {
 		return err
 	}
-	log.Infof("保存文件夹:%s", c.Save.newTargetPath)
+	log.Infof("创建 保存目标文件夹:%s", c.Save.newTargetPath)
 	return nil
 }
 func parseFlag() bool {
@@ -28,7 +34,7 @@ func parseFlag() bool {
 
 	flag.Parse()
 	if *helpText {
-		fmt.Println("项目链接:https://github.com/tengfei-xy/wolai")
+		project()
 		exit = true
 
 	}
@@ -39,21 +45,24 @@ func parseFlag() bool {
 	return exit
 }
 func main() {
+	var err error
+
 	if exit := parseFlag(); exit {
 		return
 	}
 
 	// 获取配置
-	config, err := getConfig()
+	config, err = getConfig()
 	if err != nil {
 		log.Error(err)
 		tools.Delay(5)
 		return
 	}
+
 	config.Save.newTargetPath = filepath.Join(config.Save.TargetPATH, timeGetChineseString())
 
 	// 获取所有的总页面ID和名称
-	pages, ok := getPagesList(config.Cookie)
+	workspace, ok := getPagesList(config.Cookie)
 	if !ok {
 		tools.Delay(5)
 		return
@@ -62,41 +71,14 @@ func main() {
 	// 初始化备份文件夹
 	if err := initMain(config); err != nil {
 		log.Error(err)
+		tools.Delay(5)
 		return
 	}
 
-	for _, p := range pages {
-
-		if tools.ListHasString(config.IgnorePageName, p.workSpacePageName) {
-			log.Infof("忽略工作区页面 名称:%s", p.workSpacePageName)
-			continue
-		}
-
-		reqJson, err := pageInfoToExportReqJsonAll(p)
-		if err != nil {
-			log.Error(err)
-			continue
-		}
-
-		log.Infof("正在导出%s", p.workSpacePageName)
-
-		// 获取 导出完成的下载的url
-		downloadUrl, err := exportMD(reqJson, config.Cookie)
-		if err != nil {
-			continue
-		}
-
-		// 设置下载链接和文件名
-		p.url = downloadUrl
-		u, _ := url.ParseRequestURI(p.url)
-		p.filename = filepath.Base(u.Path)
-
-		// 下载文件
-		if err := tools.FileDownload(p.url, filepath.Join(config.newTargetPath, p.filename)); err != nil {
-			log.Error(err)
-			continue
-		}
-		log.Infof("下载成功 文件名:%s 链接:%s", p.filename, p.url)
+	// 开始导出
+	for _, space := range workspace {
+		exportMain(space)
 	}
+
 	tools.Delay(5)
 }

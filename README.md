@@ -17,16 +17,26 @@ wolai的一些便捷功能，支持导出所有文章（怕官方跑路哈哈哈
 
 ## 配置文件说明
 
-```
+```yaml
+# 请从浏览器登录自己的个人空间后获取
 login:
-    # 请从浏览器登录自己的个人空间后获取
     cookie: "isg=xxx; token=xxx, wolai_client_id=xxx"
+    
+# 作为保存的目标文件夹
 save:
-		# 作为保存的目标文件夹
     targetpath: "/Users/melta/Documents/wolai"
+
+# 忽略的页面名称
 ignore:
-		# 忽略的页面名称
-    ignorePageName: ["计算机","xxx"]
+    - spaceName: "空间名"
+      pageName:
+        - ""
+        - ""
+    - spaceName: "空间名"
+      pageName:
+      # 表示忽略所有
+        - "*"
+
 ```
 
 
@@ -50,36 +60,31 @@ ignore:
 日志
 
 ```
-2023-08-02 14:12:14 pages.go:94 info  发现工作区页面 名称:密码学
-2023-08-02 14:12:14 pages.go:94 info  发现工作区页面 名称:其他
-2023-08-02 14:12:14 pages.go:94 info  发现工作区页面 名称:哲学
-2023-08-02 14:12:14 pages.go:94 info  发现工作区页面 名称:政治
-2023-08-02 14:12:14 pages.go:94 info  发现工作区页面 名称:英语
-2023-08-02 14:12:14 pages.go:94 info  发现工作区页面 名称:计算机
-2023-08-02 14:12:14 pages.go:94 info  发现工作区页面 名称:物理学
-2023-08-02 14:12:14 pages.go:94 info  发现工作区页面 名称:人生
-2023-08-02 14:12:14 pages.go:94 info  发现工作区页面 名称:历史
-2023-08-02 14:12:14 pages.go:94 info  发现工作区页面 名称:数学
-2023-08-02 14:12:14 main.go:16 info  保存文件夹:/Users/melta/Documents/wolai/2023年08月02日14点12分
-2023-08-02 14:12:14 main.go:54 info  正在导出密码学
-2023-08-02 14:12:15 main.go:72 info  下载成功 文件名:密码学.zip 链接:https://xxx.xxx.xxx/xxx.zip
-2023-08-02 14:12:15 main.go:54 info  正在导出其他
-2023-08-02 14:12:19 main.go:72 info  下载成功 文件名:其他.zip 链接:https://xxx.xxx.xxx/xxx.zip
-2023-08-02 14:12:19 main.go:54 info  正在导出哲学
-2023-08-02 14:12:21 main.go:72 info  下载成功 文件名:哲学.zip 链接:https://xxx.xxx.xxx/xxx.zip
-2023-08-02 14:12:21 main.go:54 info  正在导出政治
-2023-08-02 14:12:22 main.go:72 info  下载成功 文件名:政治.zip 链接:https://xxx.xxx.xxx/xxx.zip
-2023-08-02 14:12:22 main.go:54 info  正在导出英语
-2023-08-02 14:12:24 main.go:72 info  下载成功 文件名:英语.zip 链接:https://xxx.xxx.xxx/xxx.zip
-2023-08-02 14:12:24 main.go:44 info  忽略工作区页面 名称:计算机
-2023-08-02 14:12:24 main.go:54 info  正在导出物理学
-2023-08-02 14:12:25 main.go:72 info  下载成功 文件名:物理学.zip 链接:https://xxx.xxx.xxx/xxx.zip
-2023-08-02 14:12:25 main.go:54 info  正在导出人生
-2023-08-02 14:12:25 main.go:72 info  下载成功 文件名:人生.zip 链接:https://xxx.xxx.xxx/xxx.zip
-2023-08-02 14:12:25 main.go:54 info  正在导出历史
-2023-08-02 14:12:26 main.go:72 info  下载成功 文件名:历史.zip 链接:https://xxx.xxx.xxx/xxx.zip
-2023-08-02 14:12:26 main.go:54 info  正在导出数学
-2023-08-02 14:12:29 main.go:72 info  下载成功 文件名:数学.zip 链接:https://xxx.xxx.xxx/xxx.zip
+2023-08-10 12:36:08 pages.go:41 info  发现 工作区名称:梦娜·学不进·想自莎 页面名称:人生
+2023-08-10 12:36:08 pages.go:41 info  发现 工作区名称:梦娜·学不进·想自莎 页面名称:历史
+2023-08-10 12:36:08 pages.go:41 info  发现 工作区名称:梦娜·学不进·想自莎 页面名称:政治
+2023-08-10 12:36:08 pages.go:41 info  发现 工作区名称:梦娜·学不进·想自莎 页面名称:英语
+2023-08-10 12:36:08 pages.go:41 info  发现 工作区名称:梦娜·学不进·想自莎 页面名称:计算机
+2023-08-10 12:36:08 pages.go:41 info  发现 工作区名称:梦娜·学不进·想自莎 页面名称:密码学
+2023-08-10 12:36:08 pages.go:41 info  发现 工作区名称:梦娜·学不进·想自莎 页面名称:物理学
+2023-08-10 12:36:08 pages.go:41 info  发现 工作区名称:233 页面名称:233
+2023-08-10 12:36:08 main.go:26 info  创建 保存目标文件夹:/Users/melta/Documents/wolai/2023年08月10日12点36分
+2023-08-10 12:36:08 export.go:59 info  导出 空间名:梦娜·学不进·想自莎 页面名:人生
+2023-08-10 12:36:10 export.go:76 info  下载成功 文件名:人生.zip 链接:https://x.x.x/x.zip
+2023-08-10 12:36:10 export.go:59 info  导出 空间名:梦娜·学不进·想自莎 页面名:历史
+2023-08-10 12:36:11 export.go:76 info  下载成功 文件名:历史.zip 链接:https://x.x.x/x.zip
+2023-08-10 12:36:11 export.go:59 info  导出 空间名:梦娜·学不进·想自莎 页面名:政治
+2023-08-10 12:36:12 export.go:76 info  下载成功 文件名:政治.zip 链接:https://x.x.x/x.zip
+2023-08-10 12:36:12 export.go:59 info  导出 空间名:梦娜·学不进·想自莎 页面名:英语
+2023-08-10 12:36:13 export.go:76 info  下载成功 文件名:英语.zip 链接:https://x.x.x/x.zip
+2023-08-10 12:36:13 export.go:59 info  导出 空间名:梦娜·学不进·想自莎 页面名:计算机
+2023-08-10 12:37:20 export.go:76 info  下载成功 文件名:计算机.zip 链接:https://x.x.x/x.zip
+2023-08-10 12:37:20 export.go:59 info  导出 空间名:梦娜·学不进·想自莎 页面名:密码学
+2023-08-10 12:37:20 export.go:76 info  下载成功 文件名:密码学.zip 链接:https://x.x.x/x.zip
+2023-08-10 12:37:20 export.go:59 info  导出 空间名:梦娜·学不进·想自莎 页面名:物理学
+2023-08-10 12:37:21 export.go:76 info  下载成功 文件名:物理学.zip 链接:https://x.x.x/x.zip
+2023-08-10 12:37:21 export.go:59 info  导出 空间名:233 页面名:233
+2023-08-10 12:37:24 export.go:76 info  下载成功 文件名:233.zip 链接:https://x.x.x/x.zip
 ```
 
 可能的问题

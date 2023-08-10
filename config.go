@@ -9,36 +9,36 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func getConfig() (config, error) {
-	var c config
+func getConfig() (Config, error) {
+	var c Config
 	f := getAppPath()
 
 	file := filepath.Join(f, "config.yaml")
 
 	if !tools.FileExist(file) {
-		return config{}, configGenerate(file + ".tmp")
+		return Config{}, configGenerate(file + ".tmp")
 	}
 
 	data, err := tools.FileRead(file)
 	if err != nil {
-		return config{}, err
+		return Config{}, err
 	}
 
 	if runtime.GOOS == "windows" {
 		data, err = tools.StringGBKToUTF_8(data)
 		if err != nil {
-			return config{}, err
+			return Config{}, err
 		}
 	}
 
 	if err := yaml.Unmarshal(data, &c); err != nil {
-		return config{}, err
+		return Config{}, err
 	}
 
 	return c, configOK(c)
 }
 
-func configOK(c config) error {
+func configOK(c Config) error {
 	if c.Cookie == "" {
 		return fmt.Errorf("配置文件中的cookie值为空")
 	}
@@ -46,8 +46,15 @@ func configOK(c config) error {
 	return nil
 }
 func configGenerate(file string) error {
-	var c config
+	var c Config
 	c.TargetPATH = getAppPath()
+	c.Ignore = make([]Space, 2)
+	c.Ignore[0].SpaceName = "个人空间名"
+	c.Ignore[1].SpaceName = "个人空间名"
+	c.Ignore[0].Page = make([]string, 1)
+	c.Ignore[1].Page = make([]string, 1)
+	c.Ignore[0].Page[0] = "页面名"
+	c.Ignore[1].Page[0] = "页面名"
 
 	data, err := yaml.Marshal(c)
 	if err != nil {
@@ -59,10 +66,10 @@ func configGenerate(file string) error {
 	return fmt.Errorf("已创建新配置文件,请修改后重新运行程序 位置:%s", file)
 }
 
-type config struct {
-	Login `yaml:"login"`
-	Save  `yaml:"save"`
-	Pages `yaml:"ignore"`
+type Config struct {
+	Login  `yaml:"login"`
+	Save   `yaml:"save"`
+	Ignore []Space `yaml:"ignore"`
 }
 type Login struct {
 	Cookie string `yaml:"cookie"`
@@ -71,6 +78,7 @@ type Save struct {
 	TargetPATH    string `yaml:"targetpath"`
 	newTargetPath string
 }
-type Pages struct {
-	IgnorePageName []string `yaml:"ignorePageName"`
+type Space struct {
+	SpaceName string   `yaml:"spaceName"`
+	Page      []string `yaml:"pageName"`
 }
