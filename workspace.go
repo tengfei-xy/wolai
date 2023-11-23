@@ -5,55 +5,55 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"reflect"
 	"strings"
 
 	log "github.com/tengfei-xy/go-log"
-	"github.com/tengfei-xy/go-tools"
 )
 
-type downloadMD struct {
-	workSpaceName     string
-	workSpaceID       string
-	workSpacePageID   []string
-	workSpacePageName []string
+type workspaceInfo struct {
+	name     string
+	id       string
+	planType string
+	subspace []subspace
+}
+type subspace struct {
+	name  string
+	pages []pageList
+}
+type pageList struct {
+	name string
+	id   string
 }
 
-func getPagesList(cookie string) ([]downloadMD, bool) {
+func getWorkSpaceStruct() (workspaceDataStruct, error) {
+	var p workspaceDataStruct
 
-	// 获取工作区的所有名称、ID 和 工作区页面的ID
-	data, ok := getWorkspaceData(cookie)
-	if !ok {
-		return nil, ok
-	}
-	d, ok := pagesDataDeal(data)
-	if !ok {
-		return nil, ok
+	// 获取工作区x信息
+	h, err := getWorkspaceHtml()
+	if err != nil {
+		return workspaceDataStruct{}, err
 	}
 
-	// 补充工作区页面的名称
-	for i, space := range d {
-		data, ok := space.getWorkspacePagesData(cookie)
-
-		if !ok {
-			break
-		}
-		space.getWorkspacePagesDeal(data)
-		d[i] = space
+	err = json.Unmarshal(h, &p)
+	if err != nil {
+		return workspaceDataStruct{}, err
 	}
-
-	return d, true
+	if p.Code != 1000 {
+		return workspaceDataStruct{}, fmt.Errorf("请求异常 状态码:%d 消息:%s", p.Code, p.Message)
+	}
+	return p, nil
 }
-func getWorkspaceData(cookie string) ([]byte, bool) {
+func getWorkspaceHtml() ([]byte, error) {
 
 	client := &http.Client{}
 	req, err := http.NewRequest("POST", `https://api.wolai.com/v1/workspace/getWorkspaceData`, nil)
 	if err != nil {
-		log.Fatal(err)
-		return nil, false
+		return nil, err
 	}
 	req.Header.Set("Referer", `https://www.wolai.com/`)
-	req.Header.Set("Cookie", cookie)
+	req.Header.Set("Cookie", config.Cookie)
 	req.Header.Set("User-Agent", `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36`)
 	req.Header.Set("host", `api.wolai.com`)
 	req.Header.Set("Origin", `https://www.wolai.com`)
@@ -73,56 +73,109 @@ func getWorkspaceData(cookie string) ([]byte, bool) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Errorf("内部错误:%v", err)
-		return nil, false
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		log.Errorf("状态码:%d", resp.StatusCode)
-		return nil, false
+		return nil, fmt.Errorf("状态码:%d", resp.StatusCode)
 	}
 
 	resp_data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Errorf("内部错误:%v", err)
-		return nil, false
+		return nil, fmt.Errorf("内部错误:%v", err)
 	}
-	return resp_data, true
-
+	return resp_data, nil
 }
 
-func pagesDataDeal(data []byte) ([]downloadMD, bool) {
-	var p workspaceDataStruct
-	err := json.Unmarshal(data, &p)
+func (ws *workspaceDataStruct) getWorkspaceInfo() []workspaceInfo {
+
+	wsInfo := make([]workspaceInfo, len(ws.Data.Workspaces))
+	for i, j := range ws.Data.Workspaces {
+		wsInfo[i].name = j.Name
+		wsInfo[i].id = j.ID
+		wsInfo[i].planType = j.Plan.Type
+	}
+	return wsInfo
+}
+func (wsInfo *workspaceInfo) mkdirBackupFolder() error {
+	// 免费计划
+	if wsInfo.is_free_plan() {
+		return mkdir(filepath.Join(config.BackupPath, wsInfo.name))
+	}
+	for _, subspace := range wsInfo.subspace {
+		if err := mkdir(filepath.Join(config.BackupPath, wsInfo.name, subspace.name)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (wsInfo *workspaceInfo) is_free_plan() bool {
+	return wsInfo.planType == "free"
+}
+
+// 说明: 适用于团队模式或家庭版
+func (wsInfo *workspaceInfo) getTeamSubspace() error {
+	if wsInfo.is_free_plan() {
+		return nil
+	}
+	ts, err := getTeam(wsInfo.id)
 	if err != nil {
 		log.Error(err)
-		return nil, false
-	}
-	if p.Code != 1000 {
-		log.Errorf("请求异常 状态码:%d 消息:%s", p.Code, p.Message)
-		return nil, false
-	}
-	dmd := make([]downloadMD, len(p.Data.Workspaces))
-	for i, j := range p.Data.Workspaces {
-		dmd[i].workSpaceName = j.Name
-		dmd[i].workSpaceID = j.ID
-		dmd[i].workSpacePageID = j.Pages
-		dmd[i].workSpacePageName = make([]string, len(j.Pages))
+		return err
 	}
 
-	return dmd, true
+	wsInfo.subspace = make([]subspace, len(ts.Data))
+	for i, j := range ts.Data {
+		wsInfo.subspace[i].name = j.Name
+		wsInfo.subspace[i].pages = make([]pageList, len(j.TeamPages))
+		for z, line := range j.TeamPages {
+			wsInfo.subspace[i].pages[z].id = line
+		}
+	}
+	return nil
 }
-func (space downloadMD) getWorkspacePagesData(cookie string) ([]byte, bool) {
+
+// 说明: 适用于团队模式或家庭版
+func (wsInfo *workspaceInfo) getTermPagesMain() error {
+
+	h, err := wsInfo.getPagesHtml()
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	if wsInfo.getTermPagesDeal(h); err != nil {
+		log.Error(err)
+		return err
+	}
+	return nil
+}
+
+// 说明: 适用于团队模式或家庭版
+
+func (wsInfo *workspaceInfo) getDefaultSubspace() error {
+	wsInfo.subspace = make([]subspace, 1)
+	wsInfo.subspace[0].name = ""
+	h, err := wsInfo.getPagesHtml()
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	if err := wsInfo.getDefaultPagesDeal(h); err != nil {
+		log.Error(err)
+		return err
+	}
+	return nil
+}
+func (wsInfo *workspaceInfo) getPagesHtml() ([]byte, error) {
 
 	client := &http.Client{}
-	req, err := http.NewRequest("POST", `https://api.wolai.com/v1/workspace/getWorkspacePages`, strings.NewReader(fmt.Sprintf(`{"spaceId":"%s"}`, space.workSpaceID)))
+	req, err := http.NewRequest("POST", `https://api.wolai.com/v1/workspace/getWorkspacePages`, strings.NewReader(fmt.Sprintf(`{"spaceId":"%s"}`, wsInfo.id)))
 	if err != nil {
-		log.Fatal(err)
-		return nil, false
+		return nil, err
 	}
 	req.Header.Set("Referer", `https://www.wolai.com/`)
-	req.Header.Set("Cookie", cookie)
+	req.Header.Set("Cookie", config.Cookie)
 	req.Header.Set("User-Agent", `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36`)
 	req.Header.Set("host", `api.wolai.com`)
 	req.Header.Set("Origin", `https://www.wolai.com`)
@@ -134,7 +187,7 @@ func (space downloadMD) getWorkspacePagesData(cookie string) ([]byte, bool) {
 	req.Header.Set("Sec-Fetch-Mode", `cors`)
 	req.Header.Set("wolai-os-platform", `mac`)
 	req.Header.Set("x-client-timezone", `Asia/Shanghai`)
-	req.Header.Set("wolai-app-version", `1.1.2-3`)
+	req.Header.Set("wolai-app-version", `1.2.0-11`)
 	req.Header.Set("wolai-client-platform", `web`)
 	req.Header.Set("x-client-timeoffset", `-480`)
 	req.Header.Set("wolai-client-version", ``)
@@ -142,55 +195,73 @@ func (space downloadMD) getWorkspacePagesData(cookie string) ([]byte, bool) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Errorf("内部错误:%v", err)
-		return nil, false
+		return nil, fmt.Errorf("内部错误:%v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		log.Errorf("状态码:%d", resp.StatusCode)
-		return nil, false
+		return nil, fmt.Errorf("状态码:%d", resp.StatusCode)
 	}
 
 	resp_data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Errorf("内部错误:%v", err)
-		return nil, false
+
+		return nil, fmt.Errorf("内部错误:%v", err)
 	}
-	return resp_data, true
+	return resp_data, nil
 }
 
-func (space *downloadMD) getWorkspacePagesDeal(data []byte) bool {
+func (wsInfo *workspaceInfo) getTermPagesDeal(data []byte) error {
 	var p workSpacePageList
 	err := json.Unmarshal(data, &p)
 	if err != nil {
-		log.Error(err)
-		return false
+		return err
 	}
 	if p.Code != 1000 {
-		log.Errorf("请求异常 状态码:%d 消息:%s", p.Code, p.Message)
-		return false
+		return fmt.Errorf("请求异常 状态码:%d 消息:%s", p.Code, p.Message)
 	}
 
-	for i, _ := range space.workSpacePageName {
-		space.workSpacePageName[i] = p.Data.Blocks[space.workSpacePageID[i]].Value.Attributes.Title[0][0]
+	for i, j := range wsInfo.subspace {
+		for z, k := range j.pages {
+			wsInfo.subspace[i].pages[z].name = p.Data.Blocks[k.id].Value.Attributes.Title[0][0]
+		}
+	}
+
+	return nil
+}
+func (wsInfo *workspaceInfo) getDefaultPagesDeal(data []byte) error {
+	var p workSpacePageList
+	err := json.Unmarshal(data, &p)
+	if err != nil {
+		return err
+	}
+	if p.Code != 1000 {
+		return fmt.Errorf("请求异常 状态码:%d 消息:%s", p.Code, p.Message)
 	}
 
 	v := reflect.ValueOf(p.Data.Blocks)
-	for _, id := range v.MapKeys() {
-		if !tools.ListHasString(space.workSpacePageID, id.String()) {
-			pageName := p.Data.Blocks[id.String()].Value.Attributes.Title[0][0]
-			space.workSpacePageID = append(space.workSpacePageID, id.String())
-			space.workSpacePageName = append(space.workSpacePageName, pageName)
-
+	wsInfo.subspace[0].pages = make([]pageList, len(v.MapKeys()))
+	for i, id := range v.MapKeys() {
+		// 忽略星标置顶
+		if p.Data.Blocks[id.String()].Value.ParentType != "workspace" {
+			continue
 		}
-
+		wsInfo.subspace[0].pages[i].id = id.String()
+		wsInfo.subspace[0].pages[i].name = p.Data.Blocks[id.String()].Value.Attributes.Title[0][0]
 	}
-	return true
+	return nil
 }
-func (space downloadMD) output() {
-	for _, pageName := range space.workSpacePageName {
-		log.Infof("发现 工作区名称:%s 页面名称:%s", space.workSpaceName, pageName)
+func (wsInfo *workspaceInfo) output() {
+	var msg string
+	for _, j := range wsInfo.subspace {
+		for _, k := range j.pages {
+			if wsInfo.is_free_plan() {
+				msg = fmt.Sprintf("发现工作区:%s 页面:%s", wsInfo.name, k.name)
+			} else {
+				msg = fmt.Sprintf("发现工作区:%s 子空间:%s 页面:%s", wsInfo.name, j.name, k.name)
+			}
+			log.Infof(msg)
+		}
 	}
 }
 
@@ -309,7 +380,7 @@ type Workspaces struct {
 	Pages                      []string      `json:"pages"`
 	PlanPricePerCapitaPerDay   string        `json:"plan_price_per_capita_per_day,omitempty"`
 	PlanType                   string        `json:"plan_type"`
-	ShowWatermark              bool          `json:"show_watermark"`
+	ShowWateamark              bool          `json:"show_wateamark"`
 	StartDayOfWeek             int           `json:"start_day_of_week"`
 	StorageCount               int           `json:"storage_count,omitempty"`
 	StorageLimit               int           `json:"storage_limit,omitempty"`

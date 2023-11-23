@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 
@@ -9,14 +10,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func getConfig() (Config, error) {
+func initConfig() (Config, error) {
 	var c Config
 	f := getAppPath()
 
 	file := filepath.Join(f, "config.yaml")
 
 	if !tools.FileExist(file) {
-		return Config{}, configGenerate(file + ".tmp")
+		return Config{}, configGenerate(file)
 	}
 
 	data, err := tools.FileRead(file)
@@ -35,26 +36,94 @@ func getConfig() (Config, error) {
 		return Config{}, err
 	}
 
-	return c, configOK(c)
+	return c, c.check()
 }
 
-func configOK(c Config) error {
+func (c *Config) check() error {
 	if c.Cookie == "" {
 		return fmt.Errorf("配置文件中的cookie值为空")
+	}
+	_, err := os.Stat(c.BackupPath)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("路径不存在 %s", c.BackupPath)
+	} else if err != nil {
+		return fmt.Errorf("路径:%s 发生错误: %v ", c.BackupPath, err)
 	}
 
 	return nil
 }
+func (c *Config) getIgnoreWorkspace(ws string) int {
+	for i, j := range c.Ignore {
+		if j.Name == ws {
+			return i
+		}
+	}
+	return -1
+}
+func (c *Config) getIgnoreSubspace(freePlan bool, ws int, sp string) int {
+	if ws == -1 {
+		return -1
+	}
+	if freePlan {
+		return 0
+	}
+	for i, j := range c.Ignore[ws].Subspaces {
+		if j.Name == sp {
+			return i
+		}
+	}
+	return -1
+}
+func (c *Config) isIgnoreSubspace(ws int, subspaceName string) bool {
+	if ws == -1 {
+		return false
+	}
+	for _, subspace := range c.Ignore[ws].Subspaces {
+		if subspace.Name == "*" {
+			return true
+		}
+	}
+
+	for _, subspace := range c.Ignore[ws].Subspaces {
+		if subspace.Name == subspaceName {
+			return true
+		}
+	}
+	return false
+}
+func (c *Config) isIgnorePage(ws int, sb int, pageName string) bool {
+	if sb == -1 || ws == -1 {
+		return false
+	}
+	for _, page := range c.Ignore[ws].Subspaces[sb].Pages {
+		if page.Name == "*" {
+			return true
+		}
+	}
+
+	for _, page := range c.Ignore[ws].Subspaces[sb].Pages {
+		if page.Name == pageName {
+			return true
+		}
+	}
+	return false
+}
+
 func configGenerate(file string) error {
 	var c Config
-	c.TargetPATH = getAppPath()
-	c.Ignore = make([]Space, 2)
-	c.Ignore[0].SpaceName = "个人空间名"
-	c.Ignore[1].SpaceName = "个人空间名"
-	c.Ignore[0].Page = make([]string, 1)
-	c.Ignore[1].Page = make([]string, 1)
-	c.Ignore[0].Page[0] = "页面名"
-	c.Ignore[1].Page[0] = "页面名"
+	c.BackupPath = getAppPath()
+	c.Ignore = make([]Workspace, 2)
+	for i := range c.Ignore {
+		c.Ignore[i].Name = "工作区名"
+		c.Ignore[i].Subspaces = make([]Subspace, 2)
+		for k := range c.Ignore[i].Subspaces {
+			c.Ignore[i].Subspaces[k].Name = "子空间名"
+			c.Ignore[i].Subspaces[k].Pages = make([]Page, 2)
+			for q := range c.Ignore[i].Subspaces[k].Pages {
+				c.Ignore[i].Subspaces[k].Pages[q].Name = "页面名"
+			}
+		}
+	}
 
 	data, err := yaml.Marshal(c)
 	if err != nil {
@@ -63,22 +132,26 @@ func configGenerate(file string) error {
 	if err := tools.FileWrite(file, data); err != nil {
 		return fmt.Errorf("%s", err)
 	}
+	fmt.Println("对于团队版（家庭版），子空间是必须的，需要填写此参数，subspace项可以有多个")
+	fmt.Println("对于个人版，子空间是默认第一个的，无需（或任意）填写此参数")
 	return fmt.Errorf("已创建新配置文件,请修改后重新运行程序 位置:%s", file)
 }
 
 type Config struct {
-	Login  `yaml:"login"`
-	Save   `yaml:"save"`
-	Ignore []Space `yaml:"ignore"`
+	Cookie     string      `yaml:"cookie"`
+	BackupPath string      `yaml:"backupBackupDir"`
+	Ignore     []Workspace `yaml:"ignore"`
 }
-type Login struct {
-	Cookie string `yaml:"cookie"`
+type Workspace struct {
+	Name      string     `yaml:"workspace"`
+	Subspaces []Subspace `yaml:"subspace"`
 }
-type Save struct {
-	TargetPATH    string `yaml:"targetpath"`
-	newTargetPath string
+
+type Subspace struct {
+	Name  string `yaml:"name"`
+	Pages []Page `yaml:"page"`
 }
-type Space struct {
-	SpaceName string   `yaml:"spaceName"`
-	Page      []string `yaml:"pageName"`
+
+type Page struct {
+	Name string `yaml:"name"`
 }

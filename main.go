@@ -7,10 +7,9 @@ import (
 	"path/filepath"
 
 	log "github.com/tengfei-xy/go-log"
-	tools "github.com/tengfei-xy/go-tools"
 )
 
-const version string = "v0.2"
+const version string = "v0.3.0"
 
 var config Config
 
@@ -19,14 +18,16 @@ func project() {
 	fmt.Println("项目链接:https://github.com/tengfei-xy/wolai")
 
 }
-func initMain(c Config) error {
-	if err := os.Mkdir(c.Save.newTargetPath, 0755); err != nil {
+func mkdir(path string) error {
+	err := os.MkdirAll(path, 0755)
+	if err != nil && err != os.ErrExist {
 		return err
 	}
-	log.Infof("创建 保存目标文件夹:%s", c.Save.newTargetPath)
+	log.Infof("创建 保存目标文件夹:%s", path)
 	return nil
 }
-func parseFlag() bool {
+
+func initFalg() bool {
 
 	var exit bool = false
 	helpText := flag.Bool("h", false, "查看帮助")
@@ -47,43 +48,59 @@ func parseFlag() bool {
 func main() {
 	var err error
 
-	if exit := parseFlag(); exit {
+	if exit := initFalg(); exit {
 		return
 	}
 
 	// 获取配置
-	config, err = getConfig()
+	config, err = initConfig()
 	if err != nil {
-		log.Error(err)
-		tools.Delay(5)
-		return
+		fmt.Println(err.Error())
+	}
+	// 获取官方API的工作区结构
+	ws, err := getWorkSpaceStruct()
+	if err != nil {
+		panic(err)
+	}
+	// 将官方API的工作区结构转化为重要字段的结构体 workspaceInfo
+	wsInfos := ws.getWorkspaceInfo()
+	// 获取子空间
+	for i := range wsInfos {
+		// 免费版
+		if wsInfos[i].is_free_plan() {
+			if err := wsInfos[i].getDefaultSubspace(); err != nil {
+				panic(err)
+			}
+			continue
+		}
+		// 多人工作区 设定结构体长度并子空间的获取ID
+		if err := wsInfos[i].getTeamSubspace(); err != nil {
+			panic(err)
+		}
+		// 多人工作区 获取名称
+		if err := wsInfos[i].getTermPagesMain(); err != nil {
+			panic(err)
+		}
+
 	}
 
-	config.Save.newTargetPath = filepath.Join(config.Save.TargetPATH, timeGetChineseString())
-
-	// 获取所有的总页面ID和名称
-	workspace, ok := getPagesList(config.Cookie)
-	if !ok {
-		tools.Delay(5)
-		return
+	// 输出将被导出的页面
+	for _, wsInfo := range wsInfos {
+		wsInfo.output()
 	}
 
-	// 初始化备份文件夹
-	if err := initMain(config); err != nil {
-		log.Error(err)
-		tools.Delay(5)
-		return
-	}
-
-	// 输出页面信息
-	for _, space := range workspace {
-		space.output()
+	config.BackupPath = filepath.Join(config.BackupPath, timeGetChineseString())
+	for _, wsInfo := range wsInfos {
+		if err := wsInfo.mkdirBackupFolder(); err != nil {
+			panic(err)
+		}
 	}
 
 	// 开始导出
-	for _, space := range workspace {
-		exportMain(space)
+	for _, wsInfo := range wsInfos {
+		wsInfo.exportMain()
 	}
 
-	tools.Delay(5)
+	log.Info("导出结束!欢迎再次使用")
+
 }
