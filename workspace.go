@@ -30,7 +30,7 @@ type pageList struct {
 func getWorkSpaceStruct() (workspaceDataStruct, error) {
 	var p workspaceDataStruct
 
-	// 获取工作区x信息
+	// 获取工作区信息
 	h, err := getWorkspaceHtml()
 	if err != nil {
 		return workspaceDataStruct{}, err
@@ -65,7 +65,7 @@ func getWorkspaceHtml() ([]byte, error) {
 	req.Header.Set("Sec-Fetch-Mode", `cors`)
 	req.Header.Set("wolai-os-platform", `mac`)
 	req.Header.Set("x-client-timezone", `Asia/Shanghai`)
-	req.Header.Set("wolai-app-version", `1.1.3-1`)
+	req.Header.Set("wolai-app-version", `1.2.0-18`)
 	req.Header.Set("wolai-client-platform", `web`)
 	req.Header.Set("x-client-timeoffset", `-480`)
 	req.Header.Set("wolai-client-version", ``)
@@ -88,10 +88,14 @@ func getWorkspaceHtml() ([]byte, error) {
 	return resp_data, nil
 }
 
-func (ws *workspaceDataStruct) getWorkspaceInfo() []workspaceInfo {
+func (ws *workspaceDataStruct) getWorkspaceInfo(userid string) []workspaceInfo {
 
 	wsInfo := make([]workspaceInfo, len(ws.Data.Workspaces))
 	for i, j := range ws.Data.Workspaces {
+		if j.member_exist(userid) == false {
+			log.Warnf("跳过工作区:%s 原因:该用户是协作访客", j.Name)
+			continue
+		}
 		wsInfo[i].name = j.Name
 		wsInfo[i].id = j.ID
 		wsInfo[i].planType = j.Plan.Type
@@ -103,6 +107,7 @@ func (wsInfo *workspaceInfo) mkdirBackupFolder() error {
 	if wsInfo.is_free_plan() {
 		return mkdir(filepath.Join(config.BackupPath, wsInfo.name))
 	}
+
 	for _, subspace := range wsInfo.subspace {
 		if err := mkdir(filepath.Join(config.BackupPath, wsInfo.name, subspace.name)); err != nil {
 			return err
@@ -112,6 +117,15 @@ func (wsInfo *workspaceInfo) mkdirBackupFolder() error {
 }
 func (wsInfo *workspaceInfo) is_free_plan() bool {
 	return wsInfo.planType == "free"
+}
+func (w *Workspaces) member_exist(userid string) bool {
+	var exist bool = false
+	for _, j := range w.Members {
+		if j.UserID == userid {
+			exist = true
+		}
+	}
+	return exist
 }
 
 // 说明: 适用于团队模式或家庭版
@@ -187,7 +201,7 @@ func (wsInfo *workspaceInfo) getPagesHtml() ([]byte, error) {
 	req.Header.Set("Sec-Fetch-Mode", `cors`)
 	req.Header.Set("wolai-os-platform", `mac`)
 	req.Header.Set("x-client-timezone", `Asia/Shanghai`)
-	req.Header.Set("wolai-app-version", `1.2.0-11`)
+	req.Header.Set("wolai-app-version", `1.2.0-18`)
 	req.Header.Set("wolai-client-platform", `web`)
 	req.Header.Set("x-client-timeoffset", `-480`)
 	req.Header.Set("wolai-client-version", ``)

@@ -27,11 +27,12 @@ func mkdir(path string) error {
 	return nil
 }
 
-func initFalg() bool {
+func initFalg() (bool, string) {
 
 	var exit bool = false
 	helpText := flag.Bool("h", false, "查看帮助")
 	versionText := flag.Bool("v", false, "查看版本")
+	configFileText := flag.String("c", "config.yaml", "指定配置文件")
 
 	flag.Parse()
 	if *helpText {
@@ -43,29 +44,44 @@ func initFalg() bool {
 		fmt.Printf("%s", version)
 		exit = true
 	}
-	return exit
+	return exit, *configFileText
 }
 func main() {
 	var err error
 
-	if exit := initFalg(); exit {
+	exit, f := initFalg()
+	if exit {
 		return
 	}
+	log.Infof("读取配置文件:%s", f)
 
 	// 获取配置
-	config, err = initConfig()
+	config, err = initConfig(f)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
+
+	userid, err := getUserID()
+	if err != nil {
+		panic(err)
+	}
+
 	// 获取官方API的工作区结构
 	ws, err := getWorkSpaceStruct()
 	if err != nil {
 		panic(err)
 	}
+
 	// 将官方API的工作区结构转化为重要字段的结构体 workspaceInfo
-	wsInfos := ws.getWorkspaceInfo()
+	wsInfos := ws.getWorkspaceInfo(userid)
+
 	// 获取子空间
 	for i := range wsInfos {
+
+		if wsInfos[i].id == "" {
+			continue
+		}
+
 		// 免费版
 		if wsInfos[i].is_free_plan() {
 			if err := wsInfos[i].getDefaultSubspace(); err != nil {
@@ -73,6 +89,7 @@ func main() {
 			}
 			continue
 		}
+
 		// 多人工作区 设定结构体长度并子空间的获取ID
 		if err := wsInfos[i].getTeamSubspace(); err != nil {
 			panic(err)

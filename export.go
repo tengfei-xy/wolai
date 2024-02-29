@@ -119,7 +119,7 @@ func exportMarkdownHtml(data []byte) ([]byte, bool) {
 	req.Header.Set("Sec-Fetch-Mode", `cors`)
 	req.Header.Set("wolai-os-platform", `mac`)
 	req.Header.Set("x-client-timezone", `Asia/Shanghai`)
-	req.Header.Set("wolai-app-version", `1.2.0-11`)
+	req.Header.Set("wolai-app-version", `1.2.0-18`)
 	req.Header.Set("wolai-client-platform", `web`)
 	req.Header.Set("x-client-timeoffset", `-480`)
 	req.Header.Set("wolai-client-version", ``)

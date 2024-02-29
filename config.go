@@ -10,11 +10,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func initConfig() (Config, error) {
+func initConfig(config string) (Config, error) {
 	var c Config
 	f := getAppPath()
 
-	file := filepath.Join(f, "config.yaml")
+	file := filepath.Join(f, config)
 
 	if !tools.FileExist(file) {
 		return Config{}, configGenerate(file)

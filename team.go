@@ -25,7 +25,6 @@ func getTeam(spacceID string) (teamStruct, error) {
 	}
 	if len(ts.Data) == 0 {
 		return teamStruct{}, fmt.Errorf("空数据")
-
 	}
 	return ts, nil
 }
@@ -48,7 +47,7 @@ func getTeamHtml(spaceID string) (strings.Builder, error) {
 	req.Header.Set("Content-Type", ` application/json`)
 	req.Header.Set("wolai-os-platform", `mac`)
 	req.Header.Set("x-client-timezone", `Asia/Shanghai`)
-	req.Header.Set("wolai-app-version", `1.2.0-11`)
+	req.Header.Set("wolai-app-version", `1.2.0-18`)
 	req.Header.Set("wolai-client-platform", `web`)
 	req.Header.Set("x-client-timeoffset", `-480`)
 	req.Header.Set("wolai-client-version", ``)
