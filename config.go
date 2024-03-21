@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	tools "github.com/tengfei-xy/go-tools"
 	"gopkg.in/yaml.v3"
@@ -108,11 +109,31 @@ func (c *Config) isIgnorePage(ws int, sb int, pageName string) bool {
 	}
 	return false
 }
+func (c *Config) hasHtml() bool {
+	for _, v := range c.ExportType {
+		if strings.ToLower(v) == "html" {
+			return true
+		}
+	}
+	return false
 
+}
+func (c *Config) hasMarkdown() bool {
+
+	for _, v := range c.ExportType {
+		v = strings.ToLower(v)
+		if v == "markdown" || v == "md" {
+			return true
+		}
+	}
+	return false
+
+}
 func configGenerate(file string) error {
 	var c Config
 	c.BackupPath = getAppPath()
 	c.Ignore = make([]Workspace, 2)
+	c.ExportType = []string{"html", "markdown"}
 	for i := range c.Ignore {
 		c.Ignore[i].Name = "工作区名"
 		c.Ignore[i].Subspaces = make([]Subspace, 2)
@@ -140,6 +161,7 @@ func configGenerate(file string) error {
 type Config struct {
 	Cookie     string      `yaml:"cookie"`
 	BackupPath string      `yaml:"backupBackupDir"`
+	ExportType []string    `yaml:"exportType"`
 	Ignore     []Workspace `yaml:"ignore"`
 }
 type Workspace struct {

@@ -103,16 +103,31 @@ func (ws *workspaceDataStruct) getWorkspaceInfo(userid string) []workspaceInfo {
 	return wsInfo
 }
 func (wsInfo *workspaceInfo) mkdirBackupFolder() error {
-	// 免费计划
-	if wsInfo.is_free_plan() {
-		return mkdir(filepath.Join(config.BackupPath, wsInfo.name))
-	}
+	if config.hasHtml() {
+		// 免费计划
+		if wsInfo.is_free_plan() {
+			return mkdir(filepath.Join(config.BackupPath, "html", wsInfo.name))
+		}
 
-	for _, subspace := range wsInfo.subspace {
-		if err := mkdir(filepath.Join(config.BackupPath, wsInfo.name, subspace.name)); err != nil {
-			return err
+		for _, subspace := range wsInfo.subspace {
+			if err := mkdir(filepath.Join(config.BackupPath, "html", wsInfo.name, subspace.name)); err != nil {
+				return err
+			}
 		}
 	}
+	if config.hasMarkdown() {
+		// 免费计划
+		if wsInfo.is_free_plan() {
+			return mkdir(filepath.Join(config.BackupPath, "markdown", wsInfo.name))
+		}
+
+		for _, subspace := range wsInfo.subspace {
+			if err := mkdir(filepath.Join(config.BackupPath, "markdown", wsInfo.name, subspace.name)); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 func (wsInfo *workspaceInfo) is_free_plan() bool {

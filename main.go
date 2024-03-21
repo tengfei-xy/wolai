@@ -113,9 +113,17 @@ func main() {
 		}
 	}
 
-	// 开始导出
-	for _, wsInfo := range wsInfos {
-		wsInfo.exportMain()
+	if config.hasMarkdown() {
+		// 开始导出
+		for _, wsInfo := range wsInfos {
+			wsInfo.exportMDMain()
+		}
+	}
+	if config.hasHtml() {
+		// 开始导出
+		for _, wsInfo := range wsInfos {
+			wsInfo.exportHTMLMain()
+		}
 	}
 
 	log.Info("导出结束!欢迎再次使用")
