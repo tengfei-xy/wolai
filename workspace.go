@@ -173,7 +173,7 @@ func (wsInfo *workspaceInfo) getTermPagesMain() error {
 		log.Error(err)
 		return err
 	}
-	if wsInfo.getTermPagesDeal(h); err != nil {
+	if err := wsInfo.getTermPagesDeal(h); err != nil {
 		log.Error(err)
 		return err
 	}
@@ -241,6 +241,7 @@ func (wsInfo *workspaceInfo) getPagesHtml() ([]byte, error) {
 }
 
 func (wsInfo *workspaceInfo) getTermPagesDeal(data []byte) error {
+	fmt.Println(string(data))
 	var p workSpacePageList
 	err := json.Unmarshal(data, &p)
 	if err != nil {
@@ -321,29 +322,29 @@ type VisitRecords struct {
 }
 
 type Value struct {
-	ID                 string         `json:"id"`
-	Active             bool           `json:"active"`
-	Attributes         Attributes     `json:"attributes"`
-	BlockDiscussIds    []interface{}  `json:"block_discuss_ids"`
-	CreatedBy          string         `json:"created_by"`
-	CreatedTime        int64          `json:"created_time"`
-	EditedBy           string         `json:"edited_by"`
-	EditedTime         int64          `json:"edited_time"`
-	PageID             string         `json:"page_id"`
-	ParentID           string         `json:"parent_id"`
-	ParentType         string         `json:"parent_type"`
-	Permissions        []Permissions  `json:"permissions"`
-	Setting            Setting        `json:"setting"`
-	Status             int            `json:"status"`
-	SubNodes           []string       `json:"sub_nodes"`
-	Type               string         `json:"type"`
-	Version            int            `json:"version"`
-	ViewCount          int            `json:"view_count"`
-	VisitRecords       []VisitRecords `json:"visit_records"`
-	WorkspaceID        string         `json:"workspace_id"`
-	ResolvedDiscussIds []interface{}  `json:"resolved_discuss_ids"`
-	Tableviews         []interface{}  `json:"tableviews"`
-	SubPages           []string       `json:"sub_pages"`
+	ID                 string        `json:"id"`
+	Active             bool          `json:"active"`
+	Attributes         Attributes    `json:"attributes"`
+	BlockDiscussIds    []interface{} `json:"block_discuss_ids"`
+	CreatedBy          string        `json:"created_by"`
+	CreatedTime        int64         `json:"created_time"`
+	EditedBy           string        `json:"edited_by"`
+	EditedTime         int64         `json:"edited_time"`
+	PageID             string        `json:"page_id"`
+	ParentID           string        `json:"parent_id"`
+	ParentType         string        `json:"parent_type"`
+	Permissions        []Permissions `json:"permissions"`
+	Setting            Setting       `json:"setting"`
+	Status             int           `json:"status"`
+	SubNodes           []string      `json:"sub_nodes"`
+	Type               string        `json:"type"`
+	Version            int           `json:"version"`
+	ViewCount          int           `json:"view_count"`
+	VisitRecords       string        `json:"visit_records"`
+	WorkspaceID        string        `json:"workspace_id"`
+	ResolvedDiscussIds []interface{} `json:"resolved_discuss_ids"`
+	Tableviews         []interface{} `json:"tableviews"`
+	SubPages           []string      `json:"sub_pages"`
 }
 type DatabaseViews struct {
 }
