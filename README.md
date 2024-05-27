@@ -8,7 +8,7 @@ wolai的一些便捷功能，支持导出所有文章（怕官方跑路或丢失
 ## 说明
 
 - windows的配置文件需要保存为ANSI编码，其他系统使用utf-8
-- 微信：SXL--LP（请备注Github哦）
+- 联系方式位于[个人首页](https://github.com/tengfei-xy)
 - 后来遇到了这个应用数据丢失的问题，且无法恢复，历史记录不存在。然而md格式不太具有美观，于是新版本里添加html方便为迁移到平台提供原版的画面。
 - wolai上，我有2k个文档，耗时了9分钟完成
 - 由于官方目前没有给出导出md的正式[API](https://www.wolai.com/wolai/7FB9PLeqZ1ni9FfD11WuUi)，所以是直接用了浏览器与后端直接交互接口
