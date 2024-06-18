@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 
+	log "github.com/tengfei-xy/go-log"
 	tools "github.com/tengfei-xy/go-tools"
 	"gopkg.in/yaml.v3"
 )
@@ -16,6 +17,8 @@ func initConfig(config string) (Config, error) {
 	f := getAppPath()
 
 	file := filepath.Join(f, config)
+
+	log.Infof("读取配置文件:%s", file)
 
 	if !tools.FileExist(file) {
 		return Config{}, configGenerate(file)
@@ -86,7 +89,7 @@ func (c *Config) isIgnoreSubspace(ws int, subspaceName string) bool {
 	}
 
 	for _, subspace := range c.Ignore[ws].Subspaces {
-		if subspace.Name == subspaceName {
+		if subspace.Name == subspaceName && len(subspaceName) != 0 {
 			return true
 		}
 	}
@@ -116,7 +119,6 @@ func (c *Config) hasHtml() bool {
 		}
 	}
 	return false
-
 }
 func (c *Config) hasMarkdown() bool {
 
@@ -127,7 +129,9 @@ func (c *Config) hasMarkdown() bool {
 		}
 	}
 	return false
-
+}
+func (c *Config) addTimeBackupPath() {
+	config.BackupPath = filepath.Join(config.BackupPath, timeGetChineseString())
 }
 func configGenerate(file string) error {
 	var c Config
@@ -159,10 +163,15 @@ func configGenerate(file string) error {
 }
 
 type Config struct {
-	Cookie     string      `yaml:"cookie"`
+	Cookie string `yaml:"cookie"`
+
+	// 作为外部文件使用的变量
 	BackupPath string      `yaml:"backupBackupDir"`
 	ExportType []string    `yaml:"exportType"`
 	Ignore     []Workspace `yaml:"ignore"`
+
+	// 作为绝对路径的、内部程序使用的变量
+	backupPath string
 }
 type Workspace struct {
 	Name      string     `yaml:"workspace"`

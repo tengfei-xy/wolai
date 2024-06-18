@@ -9,21 +9,32 @@ import (
 	log "github.com/tengfei-xy/go-log"
 )
 
-func getUserID() (string, error) {
-	var p UserInfoStruct
+func getUserInfo() (WUserInfo, error) {
+	var wui WUserInfo
+	var p ReqUserInfoStruct
 	h, err := getUserIDHtml()
 	if err != nil {
-		return "", err
+		return WUserInfo{}, err
 	}
 	err = json.Unmarshal(h, &p)
 	if err != nil {
-		return "", err
+		return WUserInfo{}, err
 	}
 	if p.Code != 1000 {
-		return "", fmt.Errorf("请求异常 状态码:%d 消息:%s", p.Code, p.Message)
+		return WUserInfo{}, fmt.Errorf("请求异常 状态码:%d 消息:%s", p.Code, p.Message)
 	}
-	log.Infof("发现用户:%s", p.Data.UserID)
-	return p.Data.UserID, nil
+	wui.userid = p.Data.UserID
+
+	l := len(p.Data.WorkspaceList)
+	if l == 0 {
+		log.Fatal("未发现工作空间")
+	}
+	wui.ws = make([]workspaceInfo, l)
+
+	for i := range wui.ws {
+		wui.ws[i].id = p.Data.WorkspaceList[i]
+	}
+	return wui, nil
 }
 func getUserIDHtml() ([]byte, error) {
 	client := &http.Client{}
@@ -44,7 +55,7 @@ func getUserIDHtml() ([]byte, error) {
 	req.Header.Set("Sec-Fetch-Mode", `cors`)
 	req.Header.Set("wolai-os-platform", `mac`)
 	req.Header.Set("x-client-timezone", `Asia/Shanghai`)
-	req.Header.Set("wolai-app-version", `1.2.0-18`)
+	req.Header.Set("wolai-app-version", `1.2.2-4`)
 	req.Header.Set("wolai-client-platform", `web`)
 	req.Header.Set("x-client-timeoffset", `-480`)
 	req.Header.Set("wolai-client-version", ``)
@@ -66,36 +77,11 @@ func getUserIDHtml() ([]byte, error) {
 	}
 	return resp_data, nil
 }
-
-type UserInfoStruct struct {
-	Code    int          `json:"code"`
-	Data    UserInfoData `json:"data"`
-	Message string       `json:"message"`
+func (wui *WUserInfo) outputUserID() {
+	log.Infof("发现用户: %s", wui.userid)
 }
-type UserInfoData struct {
-	UserID                          string   `json:"userId"`
-	Mobile                          []string `json:"mobile"`
-	CountryCode                     string   `json:"countryCode"`
-	Email                           string   `json:"email"`
-	UserName                        string   `json:"userName"`
-	Avatar                          string   `json:"avatar"`
-	EmailVerified                   bool     `json:"emailVerified"`
-	Password                        bool     `json:"password"`
-	Pin                             bool     `json:"pin"`
-	UserUnshareable                 bool     `json:"userUnshareable"`
-	UserUnUploadable                bool     `json:"userUnUploadable"`
-	CreditUnavailable               bool     `json:"creditUnavailable"`
-	UserHash                        string   `json:"userHash"`
-	RecommendCode                   string   `json:"recommendCode"`
-	RegisterTime                    int64    `json:"registerTime"`
-	IsEligibleForEducationDiscount  bool     `json:"isEligibleForEducationDiscount"`
-	EducationDiscountExpirationDate int      `json:"educationDiscountExpirationDate"`
-	IsNewUser                       bool     `json:"isNewUser"`
-	RegisterMethod                  string   `json:"registerMethod"`
-	DisableKefu                     bool     `json:"disableKefu"`
-	InvitedUserCount                int      `json:"invitedUserCount"`
-	WorkspaceList                   []string `json:"workspaceList"`
-	WechatOpenID                    string   `json:"wechatOpenId"`
-	WechatWebsiteOpenID             string   `json:"wechatWebsiteOpenId"`
-	WechatUnionID                   string   `json:"wechatUnionId"`
+
+type WUserInfo struct {
+	userid string
+	ws     []workspaceInfo
 }

@@ -1,5 +1,5 @@
 docs/
 **/.DS_Store
-config.yaml*
+*.yaml
 dist/
 wolai

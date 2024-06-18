@@ -4,18 +4,22 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
+	"strings"
 
 	log "github.com/tengfei-xy/go-log"
 )
 
-const version string = "v1.1.1"
+const version string = "v1.2.0"
 
 var config Config
 
-func project() {
-	fmt.Printf("程序版本:%s\n", version)
-	fmt.Println("项目链接:https://github.com/tengfei-xy/wolai")
+func description() {
+	fmt.Printf(`                  _         _ 
+__      __  ___  | |  __ _ (_)
+\ \ /\ / / / _ \ | | / _`+"`"+` || |
+ \ V  V / | (_) || || (_| || |   程序版本: %s
+  \_/\_/   \___/ |_| \__,_||_|   项目链接: https://github.com/tengfei-xy/wolai
+                              %s`, version, "\n")
 
 }
 func mkdir(path string) error {
@@ -23,107 +27,79 @@ func mkdir(path string) error {
 	if err != nil && err != os.ErrExist {
 		return err
 	}
-	log.Infof("创建 保存目标文件夹:%s", path)
+	log.Infof("创建文件夹 路径:%s", path)
 	return nil
 }
 
-func initFalg() (bool, string) {
-
-	var exit bool = false
-	helpText := flag.Bool("h", false, "查看帮助")
-	versionText := flag.Bool("v", false, "查看版本")
-	configFileText := flag.String("c", "config.yaml", "指定配置文件")
+func initFlag() iflag {
+	var v iflag
+	flag.BoolVar(&v.help, "h", false, "查看帮助")
+	flag.BoolVar(&v.version, "v", false, "查看版本")
+	flag.StringVar(&v.configFile, "c", "config.yaml", "指定配置文件")
+	flag.StringVar(&v.loglevel, "l", log.LEVELINFO, fmt.Sprintf("日志等级,可设置参数:%s", strings.Join(log.GetLevelAll(), "、")))
 
 	flag.Parse()
-	if *helpText {
-		project()
-		exit = true
-
-	}
-	if *versionText {
-		fmt.Printf("%s", version)
-		exit = true
-	}
-	return exit, *configFileText
+	return v
+}
+func initTilte() {
+	description()
 }
 func main() {
 	var err error
+	initTilte()
 
-	exit, f := initFalg()
-	if exit {
-		return
-	}
-	log.Infof("读取配置文件:%s", f)
+	f := initFlag()
+	f.checkHelp()
+	f.checkVersion()
+	f.checkLogLevel()
 
-	// 获取配置
-	config, err = initConfig(f)
+	// 从配置文件中获取配置
+	config, err = initConfig(f.configFile)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Fatal(err)
 	}
 
-	userid, err := getUserID()
+	// 在配置文件的保存地址上，增加时间
+	config.addTimeBackupPath()
+
+	// 获取用户ID用户所在的空间ID
+	ui, err := getUserInfo()
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	// 获取官方API的工作区结构
-	ws, err := getWorkSpaceStruct()
-	if err != nil {
-		panic(err)
-	}
+	// // 获取官方API的工作区结构
+	// ws, err := getWorkSpaceStruct()
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	// 将官方API的工作区结构转化为重要字段的结构体 workspaceInfo
-	wsInfos := ws.getWorkspaceInfo(userid)
+	// // 将官方API的工作区结构转化为重要字段的结构体 workspaceInfo
+	// wsInfos := ws.getWorkspaceInfo(ui.userid)
 
-	// 获取子空间
-	for i := range wsInfos {
+	for _, ws := range ui.ws {
 
-		if wsInfos[i].id == "" {
-			continue
+		// 根据用户所在的空间ID获取用户空间的基本信息
+		ws.getBasicInfo()
+
+		// 一个子空间的处理方式
+		if ws.isDefaultSubWorkspace() {
+
+			// 获取默认子空间的信息
+			ws.getDefaultSubspace()
+		} else {
+			// 设定结构体长度并子空间的获取ID
+			ws.getTeamSubspace()
+
+			// 获取名称
+			ws.getTermPagesMain()
 		}
 
-		// 免费版
-		if wsInfos[i].is_free_plan() {
-			if err := wsInfos[i].getDefaultSubspace(); err != nil {
-				panic(err)
-			}
-			continue
-		}
+		// 进行导出MD
+		ws.exportMDMain()
 
-		// 多人工作区 设定结构体长度并子空间的获取ID
-		if err := wsInfos[i].getTeamSubspace(); err != nil {
-			panic(err)
-		}
-		// 多人工作区 获取名称
-		if err := wsInfos[i].getTermPagesMain(); err != nil {
-			panic(err)
-		}
-
-	}
-
-	// 输出将被导出的页面
-	for _, wsInfo := range wsInfos {
-		wsInfo.output()
-	}
-
-	config.BackupPath = filepath.Join(config.BackupPath, timeGetChineseString())
-	for _, wsInfo := range wsInfos {
-		if err := wsInfo.mkdirBackupFolder(); err != nil {
-			panic(err)
-		}
-	}
-
-	if config.hasMarkdown() {
-		// 开始导出
-		for _, wsInfo := range wsInfos {
-			wsInfo.exportMDMain()
-		}
-	}
-	if config.hasHtml() {
-		// 开始导出
-		for _, wsInfo := range wsInfos {
-			wsInfo.exportHTMLMain()
-		}
+		// 进行导出HTML
+		ws.exportHTMLMain()
 	}
 
 	log.Info("导出结束!欢迎再次使用")

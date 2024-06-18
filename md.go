@@ -15,15 +15,20 @@ import (
 
 func (wsInfo *workspaceInfo) exportMDMain() {
 
+	if !config.hasMarkdown() {
+		log.Debugf("忽略导出MD 名称:%s", wsInfo.name)
+		return
+	}
+
 	// 获取忽略的工作区序号
 	wsSeq := config.getIgnoreWorkspace(wsInfo.name)
 
 	for _, subspace := range wsInfo.subspace {
 		if config.isIgnoreSubspace(wsSeq, subspace.name) {
-			log.Warnf("忽略导出 工作区:%s 子空间:%s", wsInfo.name, subspace.name)
+			log.Warnf("根据配置文件忽略工作区:%s 子空间:%s", wsInfo.name, subspace.name)
 			continue
 		}
-		spSeq := config.getIgnoreSubspace(wsInfo.is_free_plan(), wsSeq, subspace.name)
+		spSeq := config.getIgnoreSubspace(wsInfo.isDefaultSubWorkspace(), wsSeq, subspace.name)
 
 		for _, page := range subspace.pages {
 			if config.isIgnorePage(wsSeq, spSeq, page.name) {
@@ -40,6 +45,7 @@ func (wsInfo *workspaceInfo) exportMDMain() {
 	}
 
 }
+
 func (wsInfo *workspaceInfo) exportMDSingle(subspaceName, pageId, pageName string) error {
 	var e exportUpJson
 	e.PageID = pageId
@@ -62,12 +68,17 @@ func (wsInfo *workspaceInfo) exportMDSingle(subspaceName, pageId, pageName strin
 	// 设置下载链接和文件名
 	u, _ := url.ParseRequestURI(fileURL)
 	filename := filepath.Base(u.Path)
-
-	if wsInfo.is_free_plan() {
-		filename = filepath.Join(config.BackupPath, "markdown", wsInfo.name, filename)
-	} else {
-		filename = filepath.Join(config.BackupPath, "markdown", wsInfo.name, subspaceName, filename)
+	var savePath string = filepath.Join(config.BackupPath, "markdown", wsInfo.name, subspaceName)
+	if wsInfo.isDefaultSubWorkspace() {
+		savePath = filepath.Join(config.BackupPath, "markdown", wsInfo.name)
 	}
+
+	// 创建备份文件夹
+	if err := mkdir(savePath); err != nil {
+		log.Fatal(err)
+	}
+
+	filename = filepath.Join(savePath, filename)
 
 	// 下载文件
 	if err := tools.FileDownload(fileURL, filename); err != nil {
@@ -105,7 +116,7 @@ func exportMarkdownHtml(data []byte) ([]byte, bool) {
 	req.Header.Set("Sec-Fetch-Mode", `cors`)
 	req.Header.Set("wolai-os-platform", `mac`)
 	req.Header.Set("x-client-timezone", `Asia/Shanghai`)
-	req.Header.Set("wolai-app-version", `1.2.0-18`)
+	req.Header.Set("wolai-app-version", `1.2.2-4`)
 	req.Header.Set("wolai-client-platform", `web`)
 	req.Header.Set("x-client-timeoffset", `-480`)
 	req.Header.Set("wolai-client-version", ``)
