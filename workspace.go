@@ -437,11 +437,11 @@ type reqWorkspaceData struct {
 	TeamType                   string             `json:"team_type"`
 	TimeZoneType               string             `json:"time_zone_type"`
 	Version                    int                `json:"version"`
-	WorkspaceIcon              []interface{}      `json:"workspace_icon"`
-	WorkspaceTemplates         []interface{}      `json:"workspace_templates"`
-	FaqPages                   []interface{}      `json:"faq_pages"`
-	FaqFiles                   []interface{}      `json:"faq_files"`
-	TeamSpaces                 []interface{}      `json:"team_spaces"`
+	// workspaceIcon              []interface{}      `json:"workspace_icon"`
+	WorkspaceTemplates []interface{} `json:"workspace_templates"`
+	FaqPages           []interface{} `json:"faq_pages"`
+	FaqFiles           []interface{} `json:"faq_files"`
+	TeamSpaces         []interface{} `json:"team_spaces"`
 }
 
 type workSpacePageList struct {
