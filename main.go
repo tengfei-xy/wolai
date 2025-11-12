@@ -9,7 +9,7 @@ import (
 	log "github.com/tengfei-xy/go-log"
 )
 
-const version string = "v1.2.1"
+const version string = "v1.2.2"
 
 var config Config
 
