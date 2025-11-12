@@ -77,9 +77,6 @@ func getUserIDHtml() ([]byte, error) {
 	}
 	return resp_data, nil
 }
-func (wui *WUserInfo) outputUserID() {
-	log.Infof("发现用户: %s", wui.userid)
-}
 
 type WUserInfo struct {
 	userid string

@@ -7,7 +7,7 @@ func getPlanTypeZh(i string) string {
 	case "personal_pro":
 		return "个人专业版"
 	case "personal_family":
-		return "团队版"
+		return "家庭版"
 	}
 	return i
 }

@@ -135,6 +135,5 @@ type TeamData struct {
 	Status      int               `json:"status"`
 	TeamPages   []string          `json:"team_pages"`
 	Version     int               `json:"version"`
-	// WorkspaceIcon []string          `json:"workspace_icon"`
-	WorkspaceID string `json:"workspace_id"`
+	WorkspaceID string            `json:"workspace_id"`
 }

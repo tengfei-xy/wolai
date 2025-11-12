@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-
-	log "github.com/tengfei-xy/go-log"
 )
 
 type iflag struct {
@@ -29,9 +27,4 @@ func (f *iflag) checkVersion() {
 		os.Exit(0)
 	}
 
-}
-func (f *iflag) checkLogLevel() {
-	log.SetLevelStr(f.loglevel)
-	_, v := log.GetLevel()
-	log.Infof("当前日志等级:%s", v)
 }

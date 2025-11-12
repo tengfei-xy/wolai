@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path/filepath"
 	"reflect"
 	"strings"
 
@@ -27,116 +26,8 @@ type pageList struct {
 	id   string
 }
 
-func getWorkSpaceStruct() (workspaceDataStruct, error) {
-	var p workspaceDataStruct
-
-	// 获取工作区信息
-	h, err := getWorkspaceHtml()
-	if err != nil {
-		return workspaceDataStruct{}, err
-	}
-
-	err = json.Unmarshal(h, &p)
-	if err != nil {
-		return workspaceDataStruct{}, err
-	}
-	if p.Code != 1000 {
-		return workspaceDataStruct{}, fmt.Errorf("请求异常 状态码:%d 消息:%s", p.Code, p.Message)
-	}
-	return p, nil
-}
-func getWorkspaceHtml() ([]byte, error) {
-
-	client := &http.Client{}
-	req, err := http.NewRequest("POST", `https://api.wolai.com/v1/workspace/getWorkspaceData`, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Referer", `https://www.wolai.com/`)
-	req.Header.Set("Cookie", config.Cookie)
-	req.Header.Set("User-Agent", `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36`)
-	req.Header.Set("host", `api.wolai.com`)
-	req.Header.Set("Origin", `https://www.wolai.com`)
-	req.Header.Set("Sec-Fetch-Dest", `empty`)
-	req.Header.Set("Sec-Fetch-Site", `same-site`)
-	req.Header.Set("Accept-Language", `zh-CN,zh;q=0.9`)
-	req.Header.Set("Accept", `application/json, text/plain, */*`)
-	req.Header.Set("Content-Type", ` application/json`)
-	req.Header.Set("Sec-Fetch-Mode", `cors`)
-	req.Header.Set("wolai-os-platform", `mac`)
-	req.Header.Set("x-client-timezone", `Asia/Shanghai`)
-	req.Header.Set("wolai-app-version", `1.2.2-4`)
-	req.Header.Set("wolai-client-platform", `web`)
-	req.Header.Set("x-client-timeoffset", `-480`)
-	req.Header.Set("wolai-client-version", ``)
-	req.Header.Set("reqId", "7NYkp7BR1wdJm1oXFRevfJ")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("状态码:%d", resp.StatusCode)
-	}
-
-	resp_data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("内部错误:%v", err)
-	}
-	return resp_data, nil
-}
-
-func (ws *workspaceDataStruct) getWorkspaceInfo(userid string) []workspaceInfo {
-
-	wsInfo := make([]workspaceInfo, len(ws.Data.Workspaces))
-	for i, j := range ws.Data.Workspaces {
-		if j.member_exist(userid) == false {
-			log.Warnf("跳过工作区:%s 原因:该用户是协作访客", j.Name)
-			continue
-		}
-		wsInfo[i].name = j.Name
-		wsInfo[i].id = j.ID
-		wsInfo[i].planType = j.Plan.Type
-		log.Infof("planType=%s", wsInfo[i].planType)
-		log.Infof("name=%s", wsInfo[i].name)
-		log.Infof("id=%s", wsInfo[i].id)
-	}
-	return wsInfo
-}
-func (wsInfo *workspaceInfo) mkdirBackupFolder() error {
-	var exportType = "html"
-
-	if config.hasMarkdown() {
-		exportType = "markdown"
-	}
-
-	if wsInfo.isDefaultSubWorkspace() {
-		config.backupPath = filepath.Join(config.BackupPath, "html", wsInfo.name)
-		return mkdir(config.backupPath)
-	}
-
-	for _, subspace := range wsInfo.subspace {
-		config.backupPath = filepath.Join(config.BackupPath, exportType, wsInfo.name)
-		if err := mkdir(filepath.Join(config.backupPath, subspace.name)); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
 func (wsInfo *workspaceInfo) isDefaultSubWorkspace() bool {
 	return isFree(wsInfo.planType) || isPersonalPro(wsInfo.planType)
-}
-func (w *Workspaces) member_exist(userid string) bool {
-	var exist bool = false
-	for _, j := range w.Members {
-		if j.UserID == userid {
-			exist = true
-		}
-	}
-	return exist
 }
 
 // 说明: 适用于团队版
@@ -235,21 +126,24 @@ func (wsInfo *workspaceInfo) getTermPagesDeal(data []byte) error {
 	var p workSpacePageList
 	err := json.Unmarshal(data, &p)
 	if err != nil {
+		log.Errorj(err)
 		return err
 	}
 	if p.Code != 1000 {
 		return fmt.Errorf("请求异常 状态码:%d 消息:%s", p.Code, p.Message)
 	}
-
 	for i, j := range wsInfo.subspace {
 		for z, k := range j.pages {
-			wsInfo.subspace[i].pages[z].name = p.Data.Blocks[k.id].Value.Attributes.Title[0][0]
+			title := p.Data.Blocks[k.id].Value.Attributes.getTitle()
+			wsInfo.subspace[i].pages[z].name = title
 		}
 	}
-
+	log.Debug3("解析完成")
 	return nil
 }
 func (wsInfo *workspaceInfo) getDefaultPagesDeal(data []byte) error {
+	log.Debug3f(string(data))
+
 	var p workSpacePageList
 	err := json.Unmarshal(data, &p)
 	if err != nil {
@@ -268,27 +162,13 @@ func (wsInfo *workspaceInfo) getDefaultPagesDeal(data []byte) error {
 		}
 		log.Debug3f("发现 %s", id)
 		wsInfo.subspace[0].pages[i].id = id.String()
-		if len(p.Data.Blocks[id.String()].Value.Attributes.Title) == 0 {
-			log.Warnf("发现页面没有名称,将使用随机字符")
-			wsInfo.subspace[0].pages[i].name = "新页面" + createRand(5)
-		} else {
-			wsInfo.subspace[0].pages[i].name = p.Data.Blocks[id.String()].Value.Attributes.Title[0][0]
-		}
+		title := p.Data.Blocks[id.String()].Value.Attributes.getTitle()
+		wsInfo.subspace[0].pages[i].name = title
 	}
+	log.Debug3("解析完成")
+
 	return nil
 }
-
-// func (wsInfo *workspaceInfo) output() {
-// 	for _, j := range wsInfo.subspace {
-// 		for _, k := range j.pages {
-// 			if wsInfo.isDefaultSubWorkspace() {
-// 				log.Infof("发现工作区:%s 页面:%s", wsInfo.name, k.name)
-// 			} else {
-// 				log.Infof("发现工作区:%s 子空间:%s 页面:%s", wsInfo.name, j.name, k.name)
-// 			}
-// 		}
-// 	}
-// }
 
 // 说明: 根据workspace的ID获取名称、计划类型
 func (wsInfo *workspaceInfo) getBasicInfo() {
@@ -313,7 +193,7 @@ func (wsInfo *workspaceInfo) getBasicInfo() {
 	}
 	wsInfo.name = p.Data.Name
 	wsInfo.planType = p.Data.Plan.Type
-	log.Infof("发现工作空间 名称:%s 计划:%s", wsInfo.name, getPlanTypeZh(wsInfo.planType))
+	log.Infof("发现工作空间 名称:%s 付费版本:%s", wsInfo.name, getPlanTypeZh(wsInfo.planType))
 }
 func getWSInfoHtml(id string) ([]byte, error) {
 
@@ -451,7 +331,37 @@ type workSpacePageList struct {
 }
 
 type Attributes struct {
-	Title [][]string `json:"title"`
+	Title []interface{} `json:"title"`
+}
+
+// getTitle 从复杂的title结构中提取标题字符串
+func (a Attributes) getTitle() string {
+	if len(a.Title) == 0 {
+		return "新页面" + createRand(5)
+	}
+
+	// 取第一个元素
+	firstElement, ok := a.Title[0].([]interface{})
+	if !ok {
+		return "新页面" + createRand(5)
+	}
+
+	if len(firstElement) == 0 {
+		return "新页面" + createRand(5)
+	}
+
+	// 取第一个子元素作为标题
+	title, ok := firstElement[0].(string)
+	if !ok {
+		return "新页面" + createRand(5)
+	}
+
+	// 如果标题为空字符串，返回随机名称
+	if title == "" {
+		return "新页面" + createRand(5)
+	}
+
+	return title
 }
 
 type Permissions struct {
@@ -510,11 +420,6 @@ type Zonelist struct {
 	Value  Value  `json:"value"`
 }
 
-type workspaceDataStruct struct {
-	Code    int           `json:"code"`
-	Data    workspaceData `json:"data"`
-	Message string        `json:"message"`
-}
 type Members struct {
 	UserID string `json:"user_id"`
 	Role   string `json:"role"`
@@ -577,8 +482,38 @@ type SecureConfig struct {
 	ID    string `json:"id"`
 	Value string `json:"value"`
 }
-type workspaceData struct {
-	Workspaces []Workspaces `json:"workspaces"`
-	// SpaceViews        `json:"spaceViews"`
-	// SecureConfig []SecureConfig `json:"secureConfig"`
+
+// processExportWithIgnore 处理导出时的忽略逻辑，为不同格式的导出提供统一的处理逻辑
+func (wsInfo *workspaceInfo) processExportWithIgnore(exportFunc func(subspaceName, pageId, pageName string) error) {
+	// 获取忽略的工作区序号
+	wsIndex := config.getIgnoreWorkspace(wsInfo.name)
+	for _, subspace := range wsInfo.subspace {
+		// 检查子空间是否需要忽略
+		if config.isIgnoreSubspace(wsIndex, subspace.name) {
+			log.Warnf("根据配置文件忽略工作区:%s 子空间:%s", wsInfo.name, subspace.name)
+			continue
+		}
+
+		// 获取子空间的序号（用于页面忽略检查）
+		spSeq := config.getIgnoreSubspace(wsInfo.isDefaultSubWorkspace(), wsIndex, subspace.name)
+
+		for _, page := range subspace.pages {
+			// 检查页面是否需要忽略
+			if config.isIgnorePage(wsIndex, spSeq, page.name) {
+				wsInfo.outputIgnore(wsInfo.name, subspace.name, page.name)
+				continue
+			}
+
+			// 跳过空页面名称
+			if page.name == "" {
+				continue
+			}
+
+			wsInfo.outputExport(wsInfo.name, subspace.name, page.name)
+			err := exportFunc(subspace.name, page.id, page.name)
+			if err != nil {
+				continue
+			}
+		}
+	}
 }

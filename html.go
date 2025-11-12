@@ -8,42 +8,20 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"time"
 
 	log "github.com/tengfei-xy/go-log"
 	tools "github.com/tengfei-xy/go-tools"
 )
 
 func (wsInfo *workspaceInfo) exportHTMLMain() {
-
 	if !config.hasHtml() {
 		log.Debugf("忽略导出HTML 名称:%s", wsInfo.name)
 		return
 	}
 
-	// 获取忽略的工作区序号
-	wsSeq := config.getIgnoreWorkspace(wsInfo.name)
-
-	for _, subspace := range wsInfo.subspace {
-		if config.isIgnoreSubspace(wsSeq, subspace.name) {
-			log.Warnf("根据配置文件忽略工作区:%s 子空间:%s", wsInfo.name, subspace.name)
-			continue
-		}
-
-		spSeq := config.getIgnoreSubspace(wsInfo.isDefaultSubWorkspace(), wsSeq, subspace.name)
-
-		for _, page := range subspace.pages {
-			if config.isIgnorePage(wsSeq, spSeq, page.name) {
-				wsInfo.outputIgnore(wsInfo.name, subspace.name, page.name)
-				continue
-			}
-			wsInfo.outputExport(wsInfo.name, subspace.name, page.name)
-			err := wsInfo.exportHtmlSingle(subspace.name, page.id, page.name)
-			if err != nil {
-				log.Error(err)
-			}
-		}
-
-	}
+	// 使用公共的导出处理逻辑
+	wsInfo.processExportWithIgnore(wsInfo.exportHtmlSingle)
 }
 
 func (wsInfo *workspaceInfo) exportHtmlSingle(subspaceName, pageId, pageName string) error {
@@ -86,12 +64,36 @@ func (wsInfo *workspaceInfo) exportHtmlSingle(subspaceName, pageId, pageName str
 	return nil
 }
 func exportDealHtml(data []byte) (string, error) {
-	d, ok := exportHtmlHtml(data)
-	if !ok {
-		return "", fmt.Errorf("获取失败")
-	}
-	return exportHtmlDeal(d)
+	// 延迟时间序列：1, 2, 5, 10, 15, 20分钟
+	delayMinutes := []int{1, 2, 5, 10, 15, 20}
+	retryCount := 0
 
+	for {
+		d, ok := exportHtmlHtml(data)
+		if !ok {
+			return "", fmt.Errorf("获取失败")
+		}
+
+		s, err, isRetry := exportHtmlDeal(d)
+		if !isRetry {
+			// 成功或者不需要重试的错误，直接返回
+			return s, err
+		}
+
+		// 需要重试
+		if retryCount >= len(delayMinutes) {
+			// 超过最大重试次数，使用最后一个延迟时间
+			delayTime := delayMinutes[len(delayMinutes)-1]
+			log.Infof("重试第 %d 次，等待 %d 分钟", retryCount+1, delayTime)
+			time.Sleep(time.Duration(delayTime) * time.Minute)
+		} else {
+			delayTime := delayMinutes[retryCount]
+			log.Infof("重试第 %d 次，等待 %d 分钟", retryCount+1, delayTime)
+			time.Sleep(time.Duration(delayTime) * time.Minute)
+		}
+
+		retryCount++
+	}
 }
 func exportHtmlHtml(data []byte) ([]byte, bool) {
 
@@ -141,18 +143,21 @@ func exportHtmlHtml(data []byte) ([]byte, bool) {
 
 }
 
-func exportHtmlDeal(data []byte) (string, error) {
+func exportHtmlDeal(data []byte) (string, error, bool) {
 	var e exportStruct
 	if err := json.Unmarshal(data, &e); err != nil {
 		log.Error(err)
-		return "", err
+		return "", err, false
 	}
 	if e.Code != 1000 {
 		err := fmt.Errorf("%s", e.Message)
+		if err.Error() == "导出频率过快，请稍后再试" {
+			return "", err, true
+		}
 		log.Error(err)
-		return "", err
+		return "", err, false
 	}
-	return e.Data, nil
+	return e.Data, nil, false
 }
 
 type exportHtmlUpJson struct {

@@ -40,13 +40,73 @@ func initConfig(config string) (Config, error) {
 		return Config{}, err
 	}
 
+	// 构建工作空间名称到索引的缓存
+	c.buildWorkspaceCache()
+
 	return c, c.check()
+}
+
+func (c *Config) initLogger() error {
+	// 根据字符串日志级别获取对应的整数级别
+	var levelInt int
+	switch strings.ToLower(c.Log.Level) {
+	case "fatal":
+		levelInt = log.LEVELFATALINT
+	case "error":
+		levelInt = log.LEVELERRORINT
+	case "warn":
+		levelInt = log.LEVELWARNINT
+	case "info":
+		levelInt = log.LEVELINFOINT
+	case "debug":
+		levelInt = log.LEVELDEBUGINT
+	case "debug1":
+		levelInt = log.LEVELDEBUG1INT
+	case "debug2":
+		levelInt = log.LEVELDEBUG2INT
+	case "debug3":
+		levelInt = log.LEVELDEBUG3INT
+	default:
+		levelInt = log.LEVELINFOINT
+	}
+
+	// 创建日志配置
+	logConfig := log.LogConfig{
+		Level:      levelInt,
+		OutputFile: c.Log.OutputFile,
+		ToConsole:  c.Log.ToConsole,
+	}
+
+	// 初始化日志系统
+	return log.Init(logConfig)
 }
 
 func (c *Config) check() error {
 	if c.Cookie == "" {
 		return fmt.Errorf("配置文件中的cookie值为空")
 	}
+
+	// 验证日志级别
+	validLogLevels := []string{"fatal", "error", "warn", "info", "debug", "debug1", "debug2", "debug3"}
+	if c.Log.Level == "" {
+		c.Log.Level = "info" // 设置默认值
+	} else {
+		validLevel := false
+		for _, level := range validLogLevels {
+			if c.Log.Level == level {
+				validLevel = true
+				break
+			}
+		}
+		if !validLevel {
+			return fmt.Errorf("无效的日志级别: %s, 支持的级别为: %s", c.Log.Level, strings.Join(validLogLevels, ", "))
+		}
+	}
+
+	// 设置默认的日志配置值
+	// LogOutputFile 可以为空，表示只输出到控制台
+	// LogToConsole 默认为 true
+
 	_, err := os.Stat(c.BackupPath)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("路径不存在 %s", c.BackupPath)
@@ -56,13 +116,43 @@ func (c *Config) check() error {
 
 	return nil
 }
+
+// buildWorkspaceCache 构建工作空间名称到索引的缓存映射
+func (c *Config) buildWorkspaceCache() {
+	c.workspaceIndexCache = make(map[string]int, len(c.Ignore))
+	for i, workspace := range c.Ignore {
+		c.workspaceIndexCache[workspace.Name] = i
+	}
+}
+
 func (c *Config) getIgnoreWorkspace(ws string) int {
-	for i, j := range c.Ignore {
-		if j.Name == ws {
-			return i
-		}
+	// 如果缓存未初始化，先构建缓存
+	if c.workspaceIndexCache == nil {
+		c.buildWorkspaceCache()
+	}
+
+	if index, exists := c.workspaceIndexCache[ws]; exists {
+		return index
 	}
 	return -1
+}
+
+// isIgnoreWorkspace 检查工作区是否应该被完全忽略
+// 当工作区下所有子空间都配置为通配符 "*" 时，表示整个工作区都应该被忽略
+func (c *Config) isIgnoreWorkspace(ws string) bool {
+	wsIndex := c.getIgnoreWorkspace(ws)
+	if wsIndex == -1 {
+		return false
+	}
+
+	// 检查是否有子空间配置为通配符 "*"
+	for _, subspace := range c.Ignore[wsIndex].Subspaces {
+		if subspace.Name == "*" {
+			return true
+		}
+	}
+
+	return false
 }
 func (c *Config) getIgnoreSubspace(freePlan bool, ws int, sp string) int {
 	if ws == -1 {
@@ -79,20 +169,22 @@ func (c *Config) getIgnoreSubspace(freePlan bool, ws int, sp string) int {
 	return -1
 }
 func (c *Config) isIgnoreSubspace(ws int, subspaceName string) bool {
-	if ws == -1 {
+
+	// 快速检查边界条件
+	if ws == -1 || ws >= len(c.Ignore) || len(subspaceName) == 0 {
 		return false
 	}
+
+	// 在一次循环中检查通配符和精确匹配
 	for _, subspace := range c.Ignore[ws].Subspaces {
 		if subspace.Name == "*" {
 			return true
 		}
-	}
-
-	for _, subspace := range c.Ignore[ws].Subspaces {
-		if subspace.Name == subspaceName && len(subspaceName) != 0 {
+		if subspace.Name == subspaceName {
 			return true
 		}
 	}
+
 	return false
 }
 func (c *Config) isIgnorePage(ws int, sb int, pageName string) bool {
@@ -136,6 +228,9 @@ func (c *Config) addTimeBackupPath() {
 func configGenerate(file string) error {
 	var c Config
 	c.BackupPath = getAppPath()
+	c.Log.Level = "info"
+	c.Log.OutputFile = ""
+	c.Log.ToConsole = true
 	c.Ignore = make([]Workspace, 2)
 	c.ExportType = []string{"html", "markdown"}
 	for i := range c.Ignore {
@@ -152,7 +247,7 @@ func configGenerate(file string) error {
 
 	data, err := yaml.Marshal(c)
 	if err != nil {
-		return fmt.Errorf("Unmarshal: %v", err)
+		return err
 	}
 	if err := tools.FileWrite(file, data); err != nil {
 		return fmt.Errorf("%s", err)
@@ -164,20 +259,25 @@ func configGenerate(file string) error {
 
 type Config struct {
 	Cookie string `yaml:"cookie"`
+	Log    Log    `yaml:"log"`
 
-	// 作为外部文件使用的变量
+	// 备份路径
 	BackupPath string      `yaml:"backupBackupDir"`
 	ExportType []string    `yaml:"exportType"`
 	Ignore     []Workspace `yaml:"ignore"`
 
-	// 作为绝对路径的、内部程序使用的变量
-	backupPath string
+	// 缓存：工作空间名称到索引的映射
+	workspaceIndexCache map[string]int
 }
 type Workspace struct {
 	Name      string     `yaml:"workspace"`
 	Subspaces []Subspace `yaml:"subspace"`
 }
-
+type Log struct {
+	Level      string `yaml:"level"`
+	OutputFile string `yaml:"outputFile"`
+	ToConsole  bool   `yaml:"toConsole"`
+}
 type Subspace struct {
 	Name  string `yaml:"name"`
 	Pages []Page `yaml:"page"`

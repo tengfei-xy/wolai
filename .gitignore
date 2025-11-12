@@ -3,3 +3,4 @@ docs/
 *.yaml
 dist/
 wolai
+*.log
